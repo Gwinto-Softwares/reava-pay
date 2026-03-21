@@ -5,6 +5,25 @@
 
 @push('styles')
 <style>
+/* Credential fields — prevent horizontal overflow */
+.cred-field {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.cred-value {
+    color: #1e293b;
+    font-size: 0.82rem;
+    word-break: break-all;
+    min-width: 0;
+    flex: 1;
+}
+
 /* Reava Pay Company Header */
 .rp-co-header {
     background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0ea5e9 100%);
@@ -232,69 +251,71 @@
             <span class="badge bg-success rounded-pill px-3 py-2"><i class="bi bi-check-circle me-1"></i> Connected</span>
             @endif
         </div>
-        <div class="rp-card-body">
+        <div class="rp-card-body" style="overflow: hidden;">
             <div class="row g-3">
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="lbl">Merchant ID</label>
-                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
-                        <code class="text-dark small">{{ $credentials['merchant_id'] ?? 'N/A' }}</code>
-                        <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['merchant_id'] ?? '' }}')"><i class="bi bi-clipboard"></i></button>
+                    <div class="cred-field">
+                        <code class="cred-value">{{ $credentials['merchant_id'] ?? 'N/A' }}</code>
+                        <button type="button" class="btn btn-sm btn-outline-primary border-0 flex-shrink-0" onclick="copyText('{{ $credentials['merchant_id'] ?? '' }}')"><i class="bi bi-clipboard"></i></button>
                     </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="lbl">Login Email</label>
-                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
-                        <code class="text-dark small">{{ $credentials['login_email'] ?? $company->email }}</code>
-                        <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['login_email'] ?? $company->email }}')"><i class="bi bi-clipboard"></i></button>
+                    <div class="cred-field">
+                        <code class="cred-value">{{ $credentials['login_email'] ?? $company->email }}</code>
+                        <button type="button" class="btn btn-sm btn-outline-primary border-0 flex-shrink-0" onclick="copyText('{{ $credentials['login_email'] ?? $company->email }}')"><i class="bi bi-clipboard"></i></button>
                     </div>
                 </div>
                 @if($credentials['login_password'] ?? null)
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="lbl"><i class="bi bi-key me-1"></i>Login Password</label>
-                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
-                        <code class="text-dark small" id="loginPasswordDisplay">{{ str_repeat('•', strlen($credentials['login_password'])) }}</code>
-                        <div class="d-flex gap-1">
+                    <div class="cred-field">
+                        <code class="cred-value" id="loginPasswordDisplay">{{ str_repeat('•', strlen($credentials['login_password'])) }}</code>
+                        <div class="d-flex gap-1 flex-shrink-0">
                             <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="toggleLoginPassword()" id="togglePasswordBtn" title="Show/Hide"><i class="bi bi-eye"></i></button>
                             <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['login_password'] }}')" title="Copy"><i class="bi bi-clipboard"></i></button>
                         </div>
                     </div>
-                    <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>Use this with the login email above to sign in at <a href="https://reavapay.com/login" target="_blank">reavapay.com</a></small>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>Sign in at <a href="https://reavapay.com/login" target="_blank">reavapay.com</a></small>
                 </div>
                 @endif
-                <div class="col-md-6">
-                    <label class="lbl">API Key</label>
-                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
-                        <code class="text-dark small">{{ $credentials['api_key'] ?? 'Not set' }}</code>
-                        <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['api_key'] ?? '' }}')"><i class="bi bi-clipboard"></i></button>
+                <div class="col-12 col-md-6">
+                    <label class="lbl">Float Account</label>
+                    <div class="cred-field">
+                        <code class="cred-value">{{ $credentials['float_account'] ?? 'Pending' }}</code>
+                        <button type="button" class="btn btn-sm btn-outline-primary border-0 flex-shrink-0" onclick="copyText('{{ $credentials['float_account'] ?? '' }}')"><i class="bi bi-clipboard"></i></button>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="lbl">Float Account</label>
-                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
-                        <code class="text-dark small">{{ $credentials['float_account'] ?? 'Pending' }}</code>
-                        <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['float_account'] ?? '' }}')"><i class="bi bi-clipboard"></i></button>
+                <div class="col-12">
+                    <label class="lbl">API Key</label>
+                    <div class="cred-field">
+                        <code class="cred-value">{{ $credentials['api_key'] ?? 'Not set' }}</code>
+                        <button type="button" class="btn btn-sm btn-outline-primary border-0 flex-shrink-0" onclick="copyText('{{ $credentials['api_key'] ?? '' }}')"><i class="bi bi-clipboard"></i></button>
                     </div>
                 </div>
                 @if($credentials['api_secret'])
                 <div class="col-12">
                     <label class="lbl"><i class="bi bi-lock me-1"></i>API Secret</label>
-                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
-                        <code class="text-dark small" id="apiSecretDisplay">{{ str_repeat('•', 40) }}</code>
-                        <div class="d-flex gap-1">
+                    <div class="cred-field">
+                        <code class="cred-value" id="apiSecretDisplay">{{ str_repeat('•', 40) }}</code>
+                        <div class="d-flex gap-1 flex-shrink-0">
                             <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="toggleSecret()" id="toggleSecretBtn" title="Show/Hide"><i class="bi bi-eye"></i></button>
                             <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['api_secret'] }}')" title="Copy"><i class="bi bi-clipboard"></i></button>
                         </div>
                     </div>
                 </div>
                 @endif
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="lbl">Environment</label>
-                    <span class="badge {{ $credentials['environment'] === 'production' ? 'bg-success' : 'bg-warning' }} rounded-pill px-3">
-                        {{ ucfirst($credentials['environment'] ?? 'sandbox') }}
-                    </span>
+                    <div>
+                        <span class="badge {{ $credentials['environment'] === 'production' ? 'bg-success' : 'bg-warning' }} rounded-pill px-3">
+                            {{ ucfirst($credentials['environment'] ?? 'sandbox') }}
+                        </span>
+                    </div>
                 </div>
                 @if($credentials['connected_at'])
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="lbl">Connected Since</label>
                     <span class="text-muted small">{{ \Carbon\Carbon::parse($credentials['connected_at'])->format('M d, Y H:i') }}</span>
                 </div>
@@ -302,12 +323,12 @@
             </div>
 
             <hr class="my-3">
-            <div class="d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center gap-2 small text-muted">
-                    <i class="bi bi-info-circle"></i>
-                    Your Gwinto wallet is synced with your Reava Pay float account. All transactions flow bi-directionally in real-time.
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+                <div class="d-flex align-items-start gap-2 small text-muted">
+                    <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
+                    <span>Your Gwinto wallet is synced with your Reava Pay float account. All transactions flow bi-directionally in real-time.</span>
                 </div>
-                <form action="{{ route('company.reava-pay.connect.process') }}" method="POST" class="d-inline">
+                <form action="{{ route('company.reava-pay.connect.process') }}" method="POST" class="d-inline flex-shrink-0">
                     @csrf
                     <input type="hidden" name="reconnect" value="1">
                     <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">

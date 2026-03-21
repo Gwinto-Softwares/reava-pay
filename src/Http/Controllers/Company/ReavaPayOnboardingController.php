@@ -72,6 +72,8 @@ class ReavaPayOnboardingController extends Controller
 
         $result = $service->disconnectCompany($company);
 
-        return back()->with($result['success'] ? 'success' : 'error', $result['message']);
+        // Redirect to connect page since settings are deleted
+        return redirect()->route('company.reava-pay.connect')
+            ->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 }

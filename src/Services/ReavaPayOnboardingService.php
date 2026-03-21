@@ -200,13 +200,14 @@ class ReavaPayOnboardingService
         $settings = ReavaPaySetting::forCompany($company->id);
 
         if ($settings) {
-            $settings->update([
-                'is_active' => false,
-            ]);
+            $settings->delete();
         }
 
         try {
-            $company->update(['reava_pay_enabled' => false]);
+            $company->update([
+                'reava_pay_enabled' => false,
+                'reava_pay_configured' => false,
+            ]);
         } catch (\Exception $e) {
             // Column may not exist — non-critical
         }

@@ -328,13 +328,22 @@
                     <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
                     <span>Your Gwinto wallet is synced with your Reava Pay float account. All transactions flow bi-directionally in real-time.</span>
                 </div>
-                <form action="{{ route('company.reava-pay.connect.process') }}" method="POST" class="d-inline flex-shrink-0">
-                    @csrf
-                    <input type="hidden" name="reconnect" value="1">
-                    <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Reconnect
-                    </button>
-                </form>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <form action="{{ route('company.reava-pay.disconnect') }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('Are you sure you want to disconnect from Reava Pay? You can reconnect later.')">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius: 8px;">
+                            <i class="bi bi-plug me-1"></i> Disconnect
+                        </button>
+                    </form>
+                    <form action="{{ route('company.reava-pay.connect.process') }}" method="POST" class="d-inline">
+                        @csrf
+                        <input type="hidden" name="reconnect" value="1">
+                        <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Reconnect
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

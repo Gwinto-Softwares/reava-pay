@@ -76,6 +76,7 @@ class ReavaPayOnboardingService
                 $apiKeyId = $data['credentials']['key_id'] ?? null;
                 $apiSecret = $data['credentials']['secret_key'] ?? null;
                 $loginPassword = $data['login_password'] ?? null;
+                $webhookSecretFromApi = $data['webhook']['secret'] ?? null;
 
                 $apiRegistered = true;
             } else {
@@ -93,8 +94,8 @@ class ReavaPayOnboardingService
             ]);
         }
 
-        // Use real credentials from Reava Pay, or generate local fallback
-        $webhookSecret = 'whsec_gwinto_' . Str::random(24);
+        // Use webhook secret from Reava Pay API, or generate local fallback
+        $webhookSecret = $webhookSecretFromApi ?? ('whsec_gwinto_' . Str::random(24));
 
         // Save settings
         $settings = ReavaPaySetting::updateOrCreate(

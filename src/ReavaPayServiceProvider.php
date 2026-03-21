@@ -68,6 +68,22 @@ class ReavaPayServiceProvider extends ServiceProvider
             __DIR__ . '/../resources/views' => resource_path('views/vendor/reava-pay'),
         ], 'reava-pay-views');
 
+        // Register artisan commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Gwinto\ReavaPay\Console\SyncTransactionsCommand::class,
+            ]);
+
+            // Schedule sync every 5 minutes
+            $this->app->booted(function () {
+                $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
+                $schedule->command('reava-pay:sync')
+                    ->everyFiveMinutes()
+                    ->withoutOverlapping()
+                    ->runInBackground();
+            });
+        }
+
         // Register observers for bi-directional sync and auto-registration
         if (class_exists(WalletTransaction::class)) {
             WalletTransaction::observe(WalletTransactionObserver::class);

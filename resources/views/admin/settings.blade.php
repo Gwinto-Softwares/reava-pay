@@ -388,6 +388,19 @@
 
     <form action="{{ route('admin.reava-pay.update') }}" method="POST" id="settingsForm">
         @csrf
+        <input type="hidden" name="active_tab" id="activeTabInput" value="{{ old('active_tab', request('tab', 'credentials')) }}">
+
+        @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="border-radius: 12px;">
+            <strong>Please fix the following errors:</strong>
+            <ul class="mb-0 mt-1">
+                @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        @endif
 
         <!-- Credentials Tab -->
         <div id="tab-credentials" class="tab-panel">
@@ -461,19 +474,13 @@
                         </div>
                         <div class="settings-card-body">
                             <div class="d-grid gap-2">
-                                <form action="{{ route('admin.reava-pay.test-connection') }}" method="POST" class="d-grid">
-                                    @csrf
-                                    <button type="submit" class="btn btn-reava-outline">
-                                        <i class="bi bi-wifi me-1"></i> Test Connection
-                                    </button>
-                                </form>
-                                <form action="{{ route('admin.reava-pay.toggle-active') }}" method="POST" class="d-grid">
-                                    @csrf
-                                    <button type="submit" class="btn {{ $settings->is_active ? 'btn-outline-danger' : 'btn-reava' }}">
-                                        <i class="bi bi-{{ $settings->is_active ? 'pause-circle' : 'play-circle' }} me-1"></i>
-                                        {{ $settings->is_active ? 'Deactivate Gateway' : 'Activate Gateway' }}
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-reava-outline" onclick="document.getElementById('testConnectionForm').submit()">
+                                    <i class="bi bi-wifi me-1"></i> Test Connection
+                                </button>
+                                <button type="button" class="btn {{ $settings->is_active ? 'btn-outline-danger' : 'btn-reava' }}" onclick="document.getElementById('toggleActiveForm').submit()">
+                                    <i class="bi bi-{{ $settings->is_active ? 'pause-circle' : 'play-circle' }} me-1"></i>
+                                    {{ $settings->is_active ? 'Deactivate Gateway' : 'Activate Gateway' }}
+                                </button>
                             </div>
 
                             <hr class="my-3">
@@ -656,6 +663,10 @@
         </div>
     </form>
 
+    <!-- Quick Action Forms (outside main form to avoid nesting) -->
+    <form id="testConnectionForm" action="{{ route('admin.reava-pay.test-connection') }}" method="POST" style="display:none;">@csrf</form>
+    <form id="toggleActiveForm" action="{{ route('admin.reava-pay.toggle-active') }}" method="POST" style="display:none;">@csrf</form>
+
     <!-- Companies Tab (outside form) -->
     <div id="tab-companies" class="tab-panel" style="display: none;">
         <div class="settings-card">
@@ -760,6 +771,10 @@ function switchTab(tab, btn) {
     document.getElementById('tab-' + tab).style.display = 'block';
     btn.classList.add('active');
 
+    // Track active tab
+    const tabInput = document.getElementById('activeTabInput');
+    if (tabInput) tabInput.value = tab;
+
     // Hide save bar for non-form tabs
     const saveBar = document.getElementById('saveBar');
     if (['companies', 'transactions'].includes(tab)) {
@@ -768,6 +783,19 @@ function switchTab(tab, btn) {
         saveBar.style.display = 'flex';
     }
 }
+
+// Restore active tab on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const activeTab = document.getElementById('activeTabInput')?.value || 'credentials';
+    if (activeTab !== 'credentials') {
+        const tabs = document.querySelectorAll('.rp-tab');
+        const tabNames = ['credentials', 'channels', 'companies', 'transactions', 'advanced'];
+        const idx = tabNames.indexOf(activeTab);
+        if (idx >= 0 && tabs[idx]) {
+            switchTab(activeTab, tabs[idx]);
+        }
+    }
+});
 
 function toggleChannel(card, inputName) {
     const input = card.querySelector('input[name="' + inputName + '"]');

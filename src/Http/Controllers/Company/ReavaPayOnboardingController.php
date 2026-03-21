@@ -27,7 +27,8 @@ class ReavaPayOnboardingController extends Controller
     {
         $company = $this->getCompany();
 
-        if ($company->reava_pay_enabled && $company->reava_pay_configured) {
+        $existingSettings = \Gwinto\ReavaPay\Models\ReavaPaySetting::forCompany($company->id);
+        if ($existingSettings && $existingSettings->is_active) {
             return redirect()->route('company.reava-pay.settings')
                 ->with('info', 'Your company is already connected to Reava Pay.');
         }
@@ -44,8 +45,9 @@ class ReavaPayOnboardingController extends Controller
     {
         $company = $this->getCompany();
         $service = new ReavaPayOnboardingService();
+        $force = $request->boolean('reconnect', false);
 
-        $result = $service->registerCompany($company);
+        $result = $service->registerCompany($company, $force);
 
         if ($result['success']) {
             // Flash credentials for one-time display

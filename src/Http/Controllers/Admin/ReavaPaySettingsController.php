@@ -56,27 +56,30 @@ class ReavaPaySettingsController extends Controller
     {
         $request->validate([
             'api_key' => 'required|string',
-            'public_key' => 'required|string',
+            'public_key' => 'nullable|string',
             'api_secret' => 'nullable|string',
             'webhook_secret' => 'nullable|string',
             'base_url' => 'required|url',
             'environment' => 'required|in:sandbox,production',
-            'default_currency' => 'required|string|max:10',
+            'default_currency' => 'nullable|string|max:10',
             'mpesa_enabled' => 'boolean',
             'card_enabled' => 'boolean',
             'bank_transfer_enabled' => 'boolean',
             'auto_credit_wallet' => 'boolean',
-            'min_transaction_amount' => 'required|numeric|min:0',
-            'max_transaction_amount' => 'required|numeric|gt:min_transaction_amount',
+            'min_transaction_amount' => 'nullable|numeric|min:0',
+            'max_transaction_amount' => 'nullable|numeric|min:0',
         ]);
 
         $settings = ReavaPaySetting::platformOrCreate();
 
         $data = $request->only([
             'api_key', 'public_key', 'webhook_secret', 'base_url',
-            'environment', 'default_currency',
-            'min_transaction_amount', 'max_transaction_amount',
+            'environment',
         ]);
+
+        $data['default_currency'] = $request->input('default_currency', $settings->default_currency ?? 'KES');
+        $data['min_transaction_amount'] = $request->input('min_transaction_amount', $settings->min_transaction_amount ?? 10);
+        $data['max_transaction_amount'] = $request->input('max_transaction_amount', $settings->max_transaction_amount ?? 150000);
 
         $data['mpesa_enabled'] = $request->boolean('mpesa_enabled');
         $data['card_enabled'] = $request->boolean('card_enabled');
@@ -91,7 +94,9 @@ class ReavaPaySettingsController extends Controller
         $settings->fill($data);
         $settings->save();
 
-        return back()->with('success', 'Reava Pay platform settings updated successfully.');
+        return back()
+            ->withInput(['active_tab' => $request->input('active_tab', 'credentials')])
+            ->with('success', 'Reava Pay platform settings updated successfully.');
     }
 
     /**

@@ -175,18 +175,6 @@
 
 @section('content')
 <div class="container-fluid">
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show" role="alert" style="border-radius: 12px; border: none; background: linear-gradient(135deg, #ecfdf5, #d1fae5);">
-        <i class="bi bi-check-circle-fill me-2 text-success"></i>{{ session('success') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    @endif
-    @if(session('error'))
-    <div class="alert alert-danger alert-dismissible fade show" role="alert" style="border-radius: 12px; border: none;">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ session('error') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    @endif
 
     <!-- Header -->
     <div class="rp-co-header">
@@ -202,8 +190,8 @@
                 @if(!$platformActive && !$settings->hasValidCredentials())
                 <span class="badge bg-danger px-3 py-2" style="border-radius: 50px;">Platform Not Active</span>
                 @else
-                <span class="badge {{ $company->reava_pay_enabled ? 'bg-success' : 'bg-secondary' }} px-3 py-2" style="border-radius: 50px;">
-                    {{ $company->reava_pay_enabled ? 'Enabled' : 'Disabled' }}
+                <span class="badge {{ $settings->is_active ? 'bg-success' : 'bg-secondary' }} px-3 py-2" style="border-radius: 50px;">
+                    {{ $settings->is_active ? 'Enabled' : 'Disabled' }}
                 </span>
                 @endif
             </div>
@@ -245,14 +233,6 @@
             @endif
         </div>
         <div class="rp-card-body">
-            @if($flashedCredentials)
-            <div class="alert alert-info mb-3" style="border-radius: 12px; border: none; background: linear-gradient(135deg, #eff6ff, #dbeafe);">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-info-circle-fill text-primary"></i>
-                    <strong>Save your credentials! The API Secret is shown only once.</strong>
-                </div>
-            </div>
-            @endif
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="lbl">Merchant ID</label>
@@ -282,12 +262,15 @@
                         <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['float_account'] ?? '' }}')"><i class="bi bi-clipboard"></i></button>
                     </div>
                 </div>
-                @if($flashedCredentials && isset($flashedCredentials['api_secret']))
+                @if($credentials['api_secret'])
                 <div class="col-12">
-                    <label class="lbl text-danger"><i class="bi bi-exclamation-triangle me-1"></i>API Secret (shown once - save it now!)</label>
-                    <div class="bg-warning bg-opacity-10 rounded-3 p-2 px-3 d-flex align-items-center justify-content-between border border-warning">
-                        <code class="text-dark small" id="apiSecretDisplay">{{ $flashedCredentials['api_secret'] }}</code>
-                        <button type="button" class="btn btn-sm btn-outline-warning border-0" onclick="copyText('{{ $flashedCredentials['api_secret'] }}')"><i class="bi bi-clipboard"></i></button>
+                    <label class="lbl"><i class="bi bi-lock me-1"></i>API Secret</label>
+                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
+                        <code class="text-dark small" id="apiSecretDisplay">{{ str_repeat('•', 40) }}</code>
+                        <div class="d-flex gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="toggleSecret()" id="toggleSecretBtn" title="Show/Hide"><i class="bi bi-eye"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['api_secret'] }}')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                        </div>
                     </div>
                 </div>
                 @endif
@@ -306,9 +289,18 @@
             </div>
 
             <hr class="my-3">
-            <div class="d-flex align-items-center gap-2 small text-muted">
-                <i class="bi bi-info-circle"></i>
-                Your Gwinto wallet is synced with your Reava Pay float account. All transactions flow bi-directionally in real-time.
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2 small text-muted">
+                    <i class="bi bi-info-circle"></i>
+                    Your Gwinto wallet is synced with your Reava Pay float account. All transactions flow bi-directionally in real-time.
+                </div>
+                <form action="{{ route('company.reava-pay.connect.process') }}" method="POST" class="d-inline">
+                    @csrf
+                    <input type="hidden" name="reconnect" value="1">
+                    <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Reconnect
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -592,6 +584,21 @@ function copyText(text) {
         btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
         setTimeout(() => btn.innerHTML = original, 2000);
     });
+}
+
+let secretVisible = false;
+const secretValue = @json($credentials['api_secret'] ?? '');
+function toggleSecret() {
+    const display = document.getElementById('apiSecretDisplay');
+    const btn = document.getElementById('toggleSecretBtn');
+    secretVisible = !secretVisible;
+    if (secretVisible) {
+        display.textContent = secretValue;
+        btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+    } else {
+        display.textContent = '••••••••••••••••••••••••••••••••••••••••';
+        btn.innerHTML = '<i class="bi bi-eye"></i>';
+    }
 }
 </script>
 @endpush

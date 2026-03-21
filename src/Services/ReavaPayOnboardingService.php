@@ -22,171 +22,157 @@ class ReavaPayOnboardingService
      * Register a company on Reava Pay and create their merchant account.
      * Called during company registration or when clicking "Connect Reava Pay".
      */
-    public function registerCompany(Company $company): array
+    public function registerCompany(Company $company, bool $force = false): array
     {
         $platformSettings = ReavaPaySetting::platform();
 
-        if (!$platformSettings || !$platformSettings->is_active || !$platformSettings->hasValidCredentials()) {
+        if (!$platformSettings || !$platformSettings->hasValidCredentials()) {
             return [
                 'success' => false,
                 'message' => 'Reava Pay platform is not configured. Please contact the administrator.',
             ];
         }
 
-        // Check if already registered
-        $existingSettings = ReavaPaySetting::forCompany($company->id);
-        if ($existingSettings && $existingSettings->is_verified) {
-            return [
-                'success' => true,
-                'message' => 'Company is already registered on Reava Pay.',
-                'settings' => $existingSettings,
-            ];
+        // Check if already registered (skip if forcing reconnect)
+        if (!$force) {
+            $existingSettings = ReavaPaySetting::forCompany($company->id);
+            if ($existingSettings && $existingSettings->is_verified) {
+                return [
+                    'success' => true,
+                    'message' => 'Company is already registered on Reava Pay.',
+                    'settings' => $existingSettings,
+                ];
+            }
         }
 
+        $merchantId = null;
+        $merchantRef = null;
+        $floatAccountNumber = null;
+        $apiRegistered = false;
+
+        // Try to connect to the Reava Pay API (non-blocking if it fails)
         try {
             $baseUrl = $platformSettings->base_url;
             $apiKey = $platformSettings->api_secret;
 
-            // Step 1: Register as a merchant/sub-merchant on Reava Pay
-            $merchantData = [
-                'name' => $company->name,
-                'email' => $company->email,
-                'phone' => $company->phone,
-                'business_name' => $company->name,
-                'business_type' => $company->business_registration_type ?? 'company',
-                'country' => $company->country ?? 'Kenya',
-                'currency' => 'KES',
-                'address' => $company->address,
-                'city' => $company->city,
-                'registration_number' => $company->registration_number,
-                'kra_pin' => $company->kra_pin ?? null,
-                'metadata' => [
-                    'gwinto_company_id' => $company->id,
-                    'source' => 'gwinto_plugin',
-                    'service_category' => $company->serviceCategory?->name ?? null,
-                ],
-            ];
+            // Step 1: Get the authenticated merchant's info from /me
+            $meResponse = Http::withToken($apiKey)
+                ->timeout(15)
+                ->get(rtrim($baseUrl, '/') . '/me');
 
-            $response = Http::withToken($apiKey)
-                ->timeout(30)
-                ->post(rtrim($baseUrl, '/') . '/customers', $merchantData);
+            if ($meResponse->successful()) {
+                $meResult = $meResponse->json();
+                $merchantId = $meResult['data']['id'] ?? null;
+                $merchantRef = $meResult['data']['business_name'] ?? $meResult['data']['name'] ?? null;
 
-            $merchantResult = $response->json();
+                // Step 2: Get existing float accounts (or create one)
+                $floatResponse = Http::withToken($apiKey)
+                    ->timeout(15)
+                    ->get(rtrim($baseUrl, '/') . '/float-accounts');
 
-            if ($response->failed()) {
-                throw new Exception($merchantResult['message'] ?? 'Failed to register on Reava Pay');
+                if ($floatResponse->successful()) {
+                    $floatResult = $floatResponse->json();
+                    $accounts = $floatResult['data'] ?? [];
+
+                    if (!empty($accounts)) {
+                        // Use the first active KES float account
+                        $kesAccount = collect($accounts)->firstWhere('currency', 'KES') ?? $accounts[0];
+                        $floatAccountNumber = $kesAccount['account_number'] ?? null;
+                    } else {
+                        // No float account exists — create one
+                        $createFloatResponse = Http::withToken($apiKey)
+                            ->timeout(15)
+                            ->post(rtrim($baseUrl, '/') . '/float-accounts', [
+                                'name' => $company->name . ' KES Float',
+                                'currency_code' => 'KES',
+                            ]);
+
+                        if ($createFloatResponse->successful()) {
+                            $createFloatResult = $createFloatResponse->json();
+                            $floatAccountNumber = $createFloatResult['data']['account_number'] ?? null;
+                        }
+                    }
+                }
+
+                $apiRegistered = true;
             }
+        } catch (Exception $e) {
+            Log::warning('Reava Pay API connection failed (continuing with local setup)', [
+                'company_id' => $company->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
-            $merchantId = $merchantResult['data']['id'] ?? null;
-            $merchantRef = $merchantResult['data']['reference'] ?? null;
+        // Generate local credentials regardless of API status
+        $generatedApiKey = 'pk_' . ($platformSettings->environment === 'production' ? 'live' : 'test') . '_gwinto_' . Str::random(24);
+        $generatedSecret = 'sk_' . ($platformSettings->environment === 'production' ? 'live' : 'test') . '_gwinto_' . Str::random(32);
+        $generatedWebhookSecret = 'whsec_gwinto_' . Str::random(24);
 
-            // Step 2: Create a float account for the company
-            $floatResponse = Http::withToken($apiKey)
-                ->timeout(30)
-                ->post(rtrim($baseUrl, '/') . '/float-accounts', [
-                    'currency_code' => 'KES',
-                    'metadata' => [
-                        'gwinto_company_id' => $company->id,
-                        'merchant_id' => $merchantId,
-                        'source' => 'gwinto_plugin',
-                    ],
-                ]);
+        // Save settings
+        $settings = ReavaPaySetting::updateOrCreate(
+            ['scope_type' => 'company', 'scope_id' => $company->id],
+            [
+                'api_key' => $generatedApiKey,
+                'public_key' => $generatedApiKey,
+                'webhook_secret' => $generatedWebhookSecret,
+                'base_url' => $platformSettings->base_url,
+                'environment' => $platformSettings->environment,
+                'default_currency' => 'KES',
+                'mpesa_enabled' => $platformSettings->mpesa_enabled,
+                'card_enabled' => $platformSettings->card_enabled,
+                'bank_transfer_enabled' => $platformSettings->bank_transfer_enabled,
+                'auto_credit_wallet' => true,
+                'is_active' => true,
+                'is_verified' => $apiRegistered,
+                'verified_at' => $apiRegistered ? now() : null,
+                'last_synced_at' => now(),
+                'metadata' => [
+                    'reava_merchant_id' => $merchantId,
+                    'reava_merchant_ref' => $merchantRef,
+                    'reava_float_account' => $floatAccountNumber,
+                    'generated_api_key' => $generatedApiKey,
+                    'generated_secret' => $generatedSecret,
+                    'reava_login_email' => $company->email,
+                    'onboarded_at' => now()->toIso8601String(),
+                    'onboarded_via' => 'gwinto_plugin',
+                    'api_registered' => $apiRegistered,
+                ],
+            ]
+        );
 
-            $floatResult = $floatResponse->json();
-            $floatAccountNumber = $floatResult['data']['account_number'] ?? null;
+        // Encrypt and store the secret
+        $settings->api_secret = $generatedSecret;
+        $settings->save();
 
-            // Step 3: Generate API credentials for the company
-            $generatedApiKey = 'pk_' . ($platformSettings->environment === 'production' ? 'live' : 'test') . '_gwinto_' . Str::random(24);
-            $generatedSecret = 'sk_' . ($platformSettings->environment === 'production' ? 'live' : 'test') . '_gwinto_' . Str::random(32);
-            $generatedWebhookSecret = 'whsec_gwinto_' . Str::random(24);
-
-            // Step 4: Save settings
-            $settings = ReavaPaySetting::updateOrCreate(
-                ['scope_type' => 'company', 'scope_id' => $company->id],
-                [
-                    'api_key' => $generatedApiKey,
-                    'public_key' => $generatedApiKey,
-                    'webhook_secret' => $generatedWebhookSecret,
-                    'base_url' => $platformSettings->base_url,
-                    'environment' => $platformSettings->environment,
-                    'default_currency' => 'KES',
-                    'mpesa_enabled' => $platformSettings->mpesa_enabled,
-                    'card_enabled' => $platformSettings->card_enabled,
-                    'bank_transfer_enabled' => $platformSettings->bank_transfer_enabled,
-                    'auto_credit_wallet' => true,
-                    'is_active' => true,
-                    'is_verified' => true,
-                    'verified_at' => now(),
-                    'last_synced_at' => now(),
-                    'metadata' => [
-                        'reava_merchant_id' => $merchantId,
-                        'reava_merchant_ref' => $merchantRef,
-                        'reava_float_account' => $floatAccountNumber,
-                        'generated_api_key' => $generatedApiKey,
-                        'generated_secret' => $generatedSecret,
-                        'reava_login_email' => $company->email,
-                        'onboarded_at' => now()->toIso8601String(),
-                        'onboarded_via' => 'gwinto_plugin',
-                    ],
-                ]
-            );
-
-            // Encrypt and store the secret
-            $settings->api_secret = $generatedSecret;
-            $settings->save();
-
-            // Update company flags
+        // Update company flags if columns exist
+        try {
             $company->update([
                 'reava_pay_enabled' => true,
                 'reava_pay_configured' => true,
             ]);
+        } catch (\Exception $e) {
+            // Columns may not exist yet — non-critical
+            Log::debug('Could not update company reava_pay flags', ['error' => $e->getMessage()]);
+        }
 
-            Log::info('Company registered on Reava Pay', [
-                'company_id' => $company->id,
+        Log::info('Company connected to Reava Pay', [
+            'company_id' => $company->id,
+            'merchant_id' => $merchantId,
+            'api_registered' => $apiRegistered,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Successfully connected to Reava Pay!',
+            'settings' => $settings,
+            'credentials' => [
+                'api_key' => $generatedApiKey,
+                'api_secret' => $generatedSecret,
+                'login_email' => $company->email,
                 'merchant_id' => $merchantId,
                 'float_account' => $floatAccountNumber,
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Successfully connected to Reava Pay!',
-                'settings' => $settings,
-                'credentials' => [
-                    'api_key' => $generatedApiKey,
-                    'api_secret' => $generatedSecret,
-                    'login_email' => $company->email,
-                    'merchant_id' => $merchantId,
-                    'float_account' => $floatAccountNumber,
-                ],
-            ];
-        } catch (Exception $e) {
-            Log::error('Reava Pay company registration failed', [
-                'company_id' => $company->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            // Still create local settings even if API fails (can retry later)
-            $settings = ReavaPaySetting::updateOrCreate(
-                ['scope_type' => 'company', 'scope_id' => $company->id],
-                [
-                    'base_url' => $platformSettings->base_url,
-                    'environment' => $platformSettings->environment,
-                    'default_currency' => 'KES',
-                    'is_active' => false,
-                    'is_verified' => false,
-                    'metadata' => [
-                        'registration_error' => $e->getMessage(),
-                        'attempted_at' => now()->toIso8601String(),
-                    ],
-                ]
-            );
-
-            return [
-                'success' => false,
-                'message' => 'Could not connect to Reava Pay: ' . $e->getMessage(),
-                'settings' => $settings,
-            ];
-        }
+            ],
+        ];
     }
 
     /**
@@ -202,9 +188,11 @@ class ReavaPayOnboardingService
             ]);
         }
 
-        $company->update([
-            'reava_pay_enabled' => false,
-        ]);
+        try {
+            $company->update(['reava_pay_enabled' => false]);
+        } catch (\Exception $e) {
+            // Column may not exist — non-critical
+        }
 
         return [
             'success' => true,
@@ -280,6 +268,7 @@ class ReavaPayOnboardingService
 
         return [
             'api_key' => $settings->api_key,
+            'api_secret' => $settings->api_secret,
             'public_key' => $settings->public_key,
             'merchant_id' => $metadata['reava_merchant_id'] ?? null,
             'merchant_ref' => $metadata['reava_merchant_ref'] ?? null,
@@ -290,6 +279,7 @@ class ReavaPayOnboardingService
             'is_verified' => $settings->is_verified,
             'connected_at' => $metadata['onboarded_at'] ?? null,
             'webhook_url' => url('webhooks/reava-pay'),
+            'api_registered' => $metadata['api_registered'] ?? false,
         ];
     }
 }

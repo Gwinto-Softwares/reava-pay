@@ -1,0 +1,35 @@
+{
+    "name": "gwinto/reava-pay",
+    "description": "Reava Pay payment gateway integration for Gwinto - Seamless M-Pesa, Card, and Bank Transfer payments",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Gwinto",
+            "email": "dev@gwinto.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0",
+        "illuminate/http": "^11.0|^12.0",
+        "illuminate/database": "^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Gwinto\\ReavaPay\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Gwinto\\ReavaPay\\ReavaPayServiceProvider"
+            ],
+            "aliases": {
+                "ReavaPay": "Gwinto\\ReavaPay\\Facades\\ReavaPay"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

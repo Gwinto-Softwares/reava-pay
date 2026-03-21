@@ -87,7 +87,7 @@
             </thead>
             <tbody>
                 @forelse($transactions as $txn)
-                <tr>
+                <tr style="cursor: pointer;" onclick="window.location='{{ route('company.reava-pay.transactions.detail', $txn->id) }}'">
                     <td>
                         <div class="fw-semibold">{{ $txn->gwinto_reference }}</div>
                         @if($txn->reava_reference)<small class="text-muted">{{ Str::limit($txn->reava_reference, 20) }}</small>@endif

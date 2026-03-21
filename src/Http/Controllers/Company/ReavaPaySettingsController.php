@@ -205,6 +205,14 @@ class ReavaPaySettingsController extends Controller
         return view('reava-pay::company.transactions', compact('company', 'transactions', 'stats'));
     }
 
+    public function transactionDetail(Request $request, $id)
+    {
+        $company = $this->getCompany();
+        $transaction = ReavaPayTransaction::where('company_id', $company->id)->findOrFail($id);
+
+        return view('reava-pay::company.transaction-detail', compact('company', 'transaction'));
+    }
+
     protected function hasPlatformCredentials(): bool
     {
         $platform = ReavaPaySetting::platform();

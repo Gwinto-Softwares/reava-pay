@@ -30,7 +30,13 @@ class ReavaPayWebhookHandler
     {
         $event = $payload['event'] ?? null;
         $data = $payload['data'] ?? [];
-        $reference = $data['reference'] ?? null;
+
+        // Try multiple reference fields — gateway may send as reference, transaction_id, payout_id, etc.
+        $reference = $data['reference']
+            ?? $data['transaction_id']
+            ?? $data['payout_id']
+            ?? $data['settlement_id']
+            ?? null;
 
         Log::info('Reava Pay Webhook Received', [
             'event' => $event,
@@ -38,6 +44,7 @@ class ReavaPayWebhookHandler
         ]);
 
         if (!$reference) {
+            Log::warning('Reava Pay webhook: No reference found in payload', ['data_keys' => array_keys($data)]);
             return ['success' => false, 'message' => 'Missing reference'];
         }
 
@@ -45,8 +52,13 @@ class ReavaPayWebhookHandler
         $transaction = ReavaPayTransaction::where('reava_reference', $reference)->first();
 
         if (!$transaction) {
+            // Also try merchant_reference (Gwinto may have stored it differently)
+            $transaction = ReavaPayTransaction::where('gwinto_reference', $data['merchant_reference'] ?? '')->first();
+        }
+
+        if (!$transaction) {
             Log::warning('Reava Pay webhook: Transaction not found', ['reference' => $reference]);
-            return ['success' => false, 'message' => 'Transaction not found'];
+            return ['success' => true, 'message' => 'Transaction not tracked locally — acknowledged'];
         }
 
         // Store raw webhook payload

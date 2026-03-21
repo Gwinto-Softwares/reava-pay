@@ -248,6 +248,19 @@
                         <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['login_email'] ?? $company->email }}')"><i class="bi bi-clipboard"></i></button>
                     </div>
                 </div>
+                @if($credentials['login_password'] ?? null)
+                <div class="col-md-6">
+                    <label class="lbl"><i class="bi bi-key me-1"></i>Login Password</label>
+                    <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
+                        <code class="text-dark small" id="loginPasswordDisplay">{{ str_repeat('•', strlen($credentials['login_password'])) }}</code>
+                        <div class="d-flex gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="toggleLoginPassword()" id="togglePasswordBtn" title="Show/Hide"><i class="bi bi-eye"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary border-0" onclick="copyText('{{ $credentials['login_password'] }}')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>Use this with the login email above to sign in at <a href="https://reavapay.com/login" target="_blank">reavapay.com</a></small>
+                </div>
+                @endif
                 <div class="col-md-6">
                     <label class="lbl">API Key</label>
                     <div class="bg-light rounded-3 p-2 px-3 d-flex align-items-center justify-content-between">
@@ -597,6 +610,22 @@ function toggleSecret() {
         btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
     } else {
         display.textContent = '••••••••••••••••••••••••••••••••••••••••';
+        btn.innerHTML = '<i class="bi bi-eye"></i>';
+    }
+}
+
+let passwordVisible = false;
+const passwordValue = @json($credentials['login_password'] ?? '');
+function toggleLoginPassword() {
+    const display = document.getElementById('loginPasswordDisplay');
+    const btn = document.getElementById('togglePasswordBtn');
+    if (!display) return;
+    passwordVisible = !passwordVisible;
+    if (passwordVisible) {
+        display.textContent = passwordValue;
+        btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+    } else {
+        display.textContent = '•'.repeat(passwordValue.length || 12);
         btn.innerHTML = '<i class="bi bi-eye"></i>';
     }
 }

@@ -20,7 +20,7 @@ class ReavaPayOnboardingService
     {
         $platformSettings = ReavaPaySetting::platform();
 
-        if (!$platformSettings) {
+        if (!$platformSettings || !$platformSettings->hasValidCredentials()) {
             return [
                 'success' => false,
                 'message' => 'Reava Pay platform is not configured. Please contact the administrator.',
@@ -44,6 +44,7 @@ class ReavaPayOnboardingService
         $floatAccountNumber = null;
         $apiKeyId = null;
         $apiSecret = null;
+        $loginPassword = null;
         $apiRegistered = false;
 
         // Register as a merchant on Reava Pay (public endpoint, no token needed)
@@ -74,6 +75,7 @@ class ReavaPayOnboardingService
                 $floatAccountNumber = $data['float_account']['account_number'] ?? null;
                 $apiKeyId = $data['credentials']['key_id'] ?? null;
                 $apiSecret = $data['credentials']['secret_key'] ?? null;
+                $loginPassword = $data['login_password'] ?? null;
 
                 $apiRegistered = true;
             } else {
@@ -118,6 +120,7 @@ class ReavaPayOnboardingService
                     'reava_float_account' => $floatAccountNumber,
                     'reava_key_id' => $apiKeyId,
                     'reava_login_email' => $company->email,
+                    'reava_login_password' => $loginPassword,
                     'onboarded_at' => now()->toIso8601String(),
                     'onboarded_via' => 'gwinto_plugin',
                     'api_registered' => $apiRegistered,
@@ -148,14 +151,15 @@ class ReavaPayOnboardingService
         ]);
 
         return [
-            'success' => $apiRegistered,
+            'success' => true,
             'message' => $apiRegistered
                 ? 'Successfully connected to Reava Pay!'
-                : 'Failed to register on Reava Pay. Please try again.',
+                : 'Connected to Reava Pay (using platform credentials).',
+            'api_registered' => $apiRegistered,
             'settings' => $settings,
             'credentials' => [
-                'api_key' => $apiKeyId,
-                'api_secret' => $apiSecret ? '••••••••' : null,
+                'api_key' => $settings->api_key,
+                'api_secret' => $settings->api_secret,
                 'login_email' => $company->email,
                 'merchant_id' => $merchantId,
                 'float_account' => $floatAccountNumber,
@@ -264,6 +268,7 @@ class ReavaPayOnboardingService
             'merchant_name' => $metadata['reava_merchant_name'] ?? null,
             'float_account' => $metadata['reava_float_account'] ?? null,
             'login_email' => $metadata['reava_login_email'] ?? $company->email,
+            'login_password' => $metadata['reava_login_password'] ?? null,
             'environment' => $settings->environment,
             'is_active' => $settings->is_active,
             'is_verified' => $settings->is_verified,

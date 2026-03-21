@@ -39,13 +39,18 @@ class ReavaPayOnboardingService
             }
         }
 
-        $merchantId = null;
-        $merchantName = null;
-        $floatAccountNumber = null;
-        $apiKeyId = null;
+        // Preserve existing metadata so reconnect doesn't lose values on API failure
+        $existingSettings = ReavaPaySetting::forCompany($company->id);
+        $existingMeta = $existingSettings?->metadata ?? [];
+
+        $merchantId = $existingMeta['reava_merchant_id'] ?? null;
+        $merchantName = $existingMeta['reava_merchant_name'] ?? null;
+        $floatAccountNumber = $existingMeta['reava_float_account'] ?? null;
+        $apiKeyId = $existingMeta['reava_key_id'] ?? null;
         $apiSecret = null;
         $loginPassword = null;
-        $apiRegistered = false;
+        $webhookSecretFromApi = null;
+        $apiRegistered = (bool) ($existingMeta['api_registered'] ?? false);
 
         // Register as a merchant on Reava Pay (public endpoint, no token needed)
         try {
@@ -94,8 +99,27 @@ class ReavaPayOnboardingService
             ]);
         }
 
+        // If registered but no password returned, call dedicated reset endpoint
+        if ($apiRegistered && !$loginPassword) {
+            try {
+                $baseUrl = $platformSettings->base_url;
+                $resetResponse = Http::withHeaders(['Accept' => 'application/json', 'Content-Type' => 'application/json'])
+                    ->timeout(15)
+                    ->post(rtrim($baseUrl, '/') . '/merchants/reset-password', [
+                        'email' => $company->email,
+                        'source' => 'gwinto',
+                    ]);
+
+                if ($resetResponse->successful()) {
+                    $loginPassword = $resetResponse->json('data.login_password');
+                }
+            } catch (Exception $e) {
+                Log::warning('Reava Pay password reset fallback failed', ['error' => $e->getMessage()]);
+            }
+        }
+
         // Use webhook secret from Reava Pay API, or generate local fallback
-        $webhookSecret = $webhookSecretFromApi ?? ('whsec_gwinto_' . Str::random(24));
+        $webhookSecret = $webhookSecretFromApi ?? ($existingSettings?->webhook_secret ?? 'whsec_gwinto_' . Str::random(24));
 
         // Save settings
         $settings = ReavaPaySetting::updateOrCreate(
@@ -121,7 +145,7 @@ class ReavaPayOnboardingService
                     'reava_float_account' => $floatAccountNumber,
                     'reava_key_id' => $apiKeyId,
                     'reava_login_email' => $company->email,
-                    'reava_login_password' => $loginPassword,
+                    'reava_login_password' => $loginPassword ?? ($existingMeta['reava_login_password'] ?? null),
                     'onboarded_at' => now()->toIso8601String(),
                     'onboarded_via' => 'gwinto_plugin',
                     'api_registered' => $apiRegistered,

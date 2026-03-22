@@ -18,5 +18,6 @@ Route::prefix('company')->name('company.')->middleware(['web', 'company.auth'])-
         Route::post('/test-connection', [ReavaPaySettingsController::class, 'testConnection'])->name('test-connection');
         Route::get('/transactions', [ReavaPaySettingsController::class, 'transactions'])->name('transactions');
         Route::get('/transactions/{id}', [ReavaPaySettingsController::class, 'transactionDetail'])->name('transactions.detail');
+        Route::post('/transactions/{id}/sync', [ReavaPaySettingsController::class, 'syncTransaction'])->name('transactions.sync');
     });
 });

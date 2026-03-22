@@ -5,6 +5,17 @@
 
 @push('styles')
 <style>
+/* Breadcrumb */
+.txn-breadcrumb { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0.6rem 1rem; }
+.bc-item { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; color: #64748b; font-size: 0.78rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 8px; transition: all 0.15s; }
+.bc-item:hover { color: #0ea5e9; background: rgba(14,165,233,0.06); }
+.bc-active { color: #1e293b; cursor: default; }
+.bc-active:hover { color: #1e293b; background: transparent; }
+.bc-icon { width: 24px; height: 24px; border-radius: 6px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: #64748b; flex-shrink: 0; }
+.bc-item:hover .bc-icon { background: rgba(14,165,233,0.1); color: #0ea5e9; }
+.bc-icon-active { background: linear-gradient(135deg, #0ea5e9, #06b6d4); color: white !important; }
+.bc-sep { color: #cbd5e1; font-size: 0.6rem; margin: 0 0.15rem; }
+
 .txn-header { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); border-radius: 16px; padding: 1.5rem 2rem; color: white; margin-bottom: 1.5rem; }
 .txn-ref { font-family: 'SF Mono', Consolas, monospace; font-size: 0.8rem; color: #94a3b8; word-break: break-all; }
 .txn-amount { font-size: 2rem; font-weight: 800; color: white; margin: 0.5rem 0; }
@@ -41,13 +52,56 @@
 @section('content')
 <div class="container-fluid py-3">
     <!-- Breadcrumb -->
-    <nav class="mb-3">
-        <ol class="breadcrumb small mb-0">
-            <li class="breadcrumb-item"><a href="{{ route('company.reava-pay.settings') }}">Reava Pay</a></li>
-            <li class="breadcrumb-item"><a href="{{ route('company.reava-pay.transactions') }}">Transactions</a></li>
-            <li class="breadcrumb-item active">{{ $transaction->gwinto_reference }}</li>
-        </ol>
+    <nav class="txn-breadcrumb mb-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-0">
+                <a href="{{ route('company.reava-pay.settings') }}" class="bc-item">
+                    <div class="bc-icon"><i class="bi bi-shield-check"></i></div>
+                    <span>Reava Pay</span>
+                </a>
+                <i class="bi bi-chevron-right bc-sep"></i>
+                <a href="{{ route('company.reava-pay.transactions') }}" class="bc-item">
+                    <div class="bc-icon"><i class="bi bi-arrow-left-right"></i></div>
+                    <span>Transactions</span>
+                </a>
+                <i class="bi bi-chevron-right bc-sep"></i>
+                <span class="bc-item bc-active">
+                    <div class="bc-icon bc-icon-active"><i class="bi bi-receipt"></i></div>
+                    <span>{{ Str::limit($transaction->gwinto_reference, 28) }}</span>
+                </span>
+            </div>
+            <div class="d-flex gap-2">
+                @if(!$transaction->isCompleted() && $transaction->reava_reference)
+                <form action="{{ route('company.reava-pay.transactions.sync', $transaction->id) }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius: 8px; font-size: 0.78rem;">
+                        <i class="bi bi-arrow-repeat me-1"></i> Sync Status
+                    </button>
+                </form>
+                @endif
+            </div>
+        </div>
     </nav>
+
+    <!-- Flash messages -->
+    @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show small py-2 px-3" style="border-radius: 10px;">
+        <i class="bi bi-check-circle me-1"></i> {{ session('success') }}
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
+    @if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show small py-2 px-3" style="border-radius: 10px;">
+        <i class="bi bi-exclamation-triangle me-1"></i> {{ session('error') }}
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
+    @if(session('info'))
+    <div class="alert alert-info alert-dismissible fade show small py-2 px-3" style="border-radius: 10px;">
+        <i class="bi bi-info-circle me-1"></i> {{ session('info') }}
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
 
     <!-- Header -->
     <div class="txn-header">
@@ -60,12 +114,20 @@
                         {{ $transaction->channel_label }}
                     </span>
                 </div>
-                <div class="txn-amount">KES {{ number_format($transaction->amount, 2) }}</div>
+                <div class="txn-amount">{{ $transaction->currency }} {{ number_format($transaction->amount, 2) }}</div>
                 <div class="txn-ref">{{ $transaction->gwinto_reference }}</div>
             </div>
-            <div class="text-end">
+            <div class="text-end d-flex flex-column align-items-end gap-1">
                 <div class="small text-white-50">{{ $transaction->type_label }}</div>
                 <div class="small text-white-50">{{ $transaction->created_at->format('M d, Y H:i:s') }}</div>
+                @if(!$transaction->isCompleted() && $transaction->reava_reference)
+                <form action="{{ route('company.reava-pay.transactions.sync', $transaction->id) }}" method="POST" class="mt-1">
+                    @csrf
+                    <button type="submit" class="btn btn-sm text-white" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; font-size: 0.75rem; backdrop-filter: blur(4px);">
+                        <i class="bi bi-arrow-repeat me-1"></i> Sync from Reava Pay
+                    </button>
+                </form>
+                @endif
             </div>
         </div>
     </div>

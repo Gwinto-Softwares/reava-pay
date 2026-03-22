@@ -213,6 +213,52 @@ class ReavaPaySettingsController extends Controller
         return view('reava-pay::company.transaction-detail', compact('company', 'transaction'));
     }
 
+    public function syncTransaction(Request $request, $id)
+    {
+        $company = $this->getCompany();
+        $transaction = ReavaPayTransaction::where('company_id', $company->id)->findOrFail($id);
+
+        if (!$transaction->reava_reference) {
+            return back()->with('error', 'No Reava Pay reference to sync.');
+        }
+
+        try {
+            $gateway = ReavaPayGateway::forCompany($company->id);
+            $result = $gateway->checkTransactionStatus($transaction->reava_reference);
+
+            if ($result && isset($result['data'])) {
+                $apiStatus = $result['data']['status'] ?? null;
+                $providerRef = $result['data']['provider_reference'] ?? $result['data']['external_reference'] ?? null;
+
+                if ($apiStatus === 'completed' && !$transaction->isCompleted()) {
+                    $handler = app(\Gwinto\ReavaPay\Services\ReavaPayWebhookHandler::class);
+                    $handler->handle([
+                        'event' => 'collection.completed',
+                        'data' => array_merge($result['data'], [
+                            'reference' => $transaction->reava_reference,
+                        ]),
+                    ]);
+                    return back()->with('success', 'Transaction synced — marked as completed.');
+                } elseif ($apiStatus === 'failed' && !$transaction->isFailed()) {
+                    $transaction->markAsFailed($result['data']['failure_reason'] ?? 'Payment failed', [
+                        'reava_response' => $result['data'],
+                    ]);
+                    return back()->with('success', 'Transaction synced — marked as failed.');
+                } else {
+                    $transaction->update([
+                        'provider_reference' => $providerRef ?? $transaction->provider_reference,
+                        'reava_response' => $result['data'],
+                    ]);
+                    return back()->with('info', "Transaction status on Reava Pay: {$apiStatus}. Local status unchanged.");
+                }
+            }
+
+            return back()->with('error', 'Could not fetch status from Reava Pay.');
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Sync failed: ' . $e->getMessage());
+        }
+    }
+
     protected function hasPlatformCredentials(): bool
     {
         $platform = ReavaPaySetting::platform();

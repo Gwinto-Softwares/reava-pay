@@ -143,6 +143,20 @@ class ReavaPayWebhookHandler
             'reava_response' => $data,
         ]);
 
+        // Mark linked pending wallet transaction as failed too
+        if ($transaction->wallet_transaction_id) {
+            $walletTx = \App\Models\WalletTransaction::find($transaction->wallet_transaction_id);
+            if ($walletTx && $walletTx->status === 'pending') {
+                $walletTx->update([
+                    'status' => 'failed',
+                    'metadata' => array_merge($walletTx->metadata ?? [], [
+                        'failure_reason' => $reason,
+                        'failed_via' => 'webhook',
+                    ]),
+                ]);
+            }
+        }
+
         event(new ReavaPayPaymentFailed($transaction));
 
         return ['success' => true, 'message' => 'Failure recorded'];
@@ -185,11 +199,38 @@ class ReavaPayWebhookHandler
             throw new Exception('Payer wallet not found for top-up');
         }
 
-        $settings = $this->getSettingsForTransaction($transaction);
-        if (!$settings || !$settings->auto_credit_wallet) {
-            return;
+        // If there's an existing pending wallet transaction from initiation, complete it
+        if ($transaction->wallet_transaction_id) {
+            $existingWalletTx = \App\Models\WalletTransaction::find($transaction->wallet_transaction_id);
+            if ($existingWalletTx && $existingWalletTx->status === 'pending') {
+                // Credit the wallet balance
+                $wallet->balance += $transaction->amount;
+                $wallet->last_transaction_at = now();
+                $wallet->save();
+
+                // Update the existing wallet transaction to completed
+                $existingWalletTx->update([
+                    'balance_before' => $wallet->balance - $transaction->amount,
+                    'balance_after' => $wallet->balance,
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'metadata' => array_merge($existingWalletTx->metadata ?? [], [
+                        'reava_reference' => $transaction->reava_reference,
+                        'provider_reference' => $transaction->provider_reference,
+                        'completed_via' => 'webhook',
+                    ]),
+                ]);
+
+                Log::info('Wallet top-up completed (existing transaction updated)', [
+                    'wallet_id' => $wallet->id,
+                    'amount' => $transaction->amount,
+                    'wallet_transaction_id' => $existingWalletTx->id,
+                ]);
+                return;
+            }
         }
 
+        // No existing wallet transaction — create a new one via WalletService
         $result = $this->walletService->credit($wallet, $transaction->amount, [
             'category' => 'wallet_topup',
             'description' => 'Wallet top-up via Reava Pay (' . $transaction->channel_label . ')',

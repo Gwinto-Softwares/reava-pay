@@ -68,10 +68,22 @@ class ReavaPayWebhookHandler
         // Store raw webhook payload
         $transaction->update(['webhook_payload' => $payload]);
 
-        return match ($event) {
-            'transaction.completed' => $this->handleCompleted($transaction, $data),
-            'transaction.failed' => $this->handleFailed($transaction, $data),
-            'transaction.reversed' => $this->handleReversed($transaction, $data),
+        // Match all completed/failed/reversed events regardless of prefix
+        // Gateway sends: collection.completed, collection.failed, payout.completed,
+        // transaction.completed, settlement.completed, etc.
+        $action = null;
+        if (str_ends_with($event, '.completed')) {
+            $action = 'completed';
+        } elseif (str_ends_with($event, '.failed')) {
+            $action = 'failed';
+        } elseif (str_ends_with($event, '.reversed')) {
+            $action = 'reversed';
+        }
+
+        return match ($action) {
+            'completed' => $this->handleCompleted($transaction, $data),
+            'failed' => $this->handleFailed($transaction, $data),
+            'reversed' => $this->handleReversed($transaction, $data),
             default => ['success' => true, 'message' => 'Event acknowledged'],
         };
     }

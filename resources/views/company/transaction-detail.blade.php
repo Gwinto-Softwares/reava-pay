@@ -41,8 +41,8 @@
 .rpd-bc-active { color: #111827; cursor: default; pointer-events: none; }
 .rpd-bc-active .rpd-bc-ico { background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; }
 .rpd-bc-sep { color: #d1d5db; font-size: 0.7rem; padding: 0 2px; }
-.rpd-bc-ref { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
-@media (max-width: 480px) { .rpd-bc-ref { max-width: 90px; } }
+.rpd-bc-ref { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
+@media (max-width: 480px) { .rpd-bc-ref { max-width: 160px; } }
 
 /* ── Flash alerts ── */
 .rpd-alert {

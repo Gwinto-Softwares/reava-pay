@@ -478,18 +478,6 @@
 @section('content')
 <div class="rp-wrap">
 
-    {{-- Flash messages --}}
-    @if(session('success'))
-    <div class="rp-alert rp-alert-success">
-        <i class="bi bi-check-circle-fill"></i> {{ session('success') }}
-    </div>
-    @endif
-    @if(session('error'))
-    <div class="rp-alert rp-alert-error">
-        <i class="bi bi-exclamation-circle-fill"></i> {{ session('error') }}
-    </div>
-    @endif
-
     {{-- ── Hero ── --}}
     <div class="rp-hero">
         <div class="rp-hero-top">
@@ -500,9 +488,15 @@
                     <div class="rp-hero-sub">Accept M-Pesa, Card &amp; Bank payments from your tenants</div>
                 </div>
             </div>
-            @if(!$platformActive && !$settings->hasValidCredentials())
+            @php
+                $isActive = ($credentials && ($credentials['is_active'] ?? false))
+                    || $settings->is_active
+                    || ($company->reava_pay_enabled ?? false);
+                $hasAnyCredentials = $credentials || $settings->hasValidCredentials() || $platformActive;
+            @endphp
+            @if(!$hasAnyCredentials)
             <span class="rp-hero-badge warn"><i class="bi bi-exclamation-circle-fill"></i> Not Active</span>
-            @elseif($company->reava_pay_enabled ?? $settings->is_active)
+            @elseif($isActive)
             <span class="rp-hero-badge on"><span class="rp-pulse"></span> Enabled</span>
             @else
             <span class="rp-hero-badge off"><i class="bi bi-pause-circle"></i> Disabled</span>
@@ -538,21 +532,23 @@
             {{-- ── Credentials Display ── --}}
             @if($credentials)
             <div class="rp-card">
-                <div class="rp-card-head" style="background: linear-gradient(to right, #f0f9ff, #eff6ff);">
-                    <div class="rp-card-ico" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff;">
-                        <i class="bi bi-shield-check"></i>
-                    </div>
-                    <div class="rp-card-head-text">
-                        <div class="rp-card-head-title" style="color: #0369a1;">Reava Pay Credentials</div>
-                        <div class="rp-card-head-desc">Your merchant credentials. Use these to access the Reava Pay dashboard.</div>
-                    </div>
-                    <div class="ms-auto d-flex align-items-center gap-2">
-                        <span class="rp-env-pill {{ ($credentials['environment'] ?? '') === 'production' ? 'live' : 'test' }}">
-                            {{ ($credentials['environment'] ?? '') === 'production' ? 'Production' : 'Sandbox' }}
-                        </span>
-                        @if($credentials['is_active'] ?? false)
-                        <span class="rp-badge rp-badge-green"><i class="bi bi-check2"></i> Connected</span>
-                        @endif
+                <div style="background: linear-gradient(135deg, #f0f9ff, #eff6ff); padding: 16px 20px; border-bottom: 1px solid #dbeafe;">
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                            <i class="bi bi-shield-check"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.92rem;font-weight:800;color:#0369a1;line-height:1.3;">Reava Pay Credentials</div>
+                            <div style="font-size:0.74rem;color:#64748b;margin-top:2px;">Your merchant credentials. Use these to access the Reava Pay dashboard.</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;">
+                            <span class="rp-env-pill {{ ($credentials['environment'] ?? '') === 'production' ? 'live' : 'test' }}">
+                                {{ ($credentials['environment'] ?? '') === 'production' ? 'Production' : 'Sandbox' }}
+                            </span>
+                            @if($credentials['is_active'] ?? false)
+                            <span class="rp-badge rp-badge-green" style="white-space:nowrap;"><i class="bi bi-check-circle-fill"></i> Connected</span>
+                            @endif
+                        </div>
                     </div>
                 </div>
                 <div class="rp-card-body">
@@ -835,8 +831,8 @@
                 <div class="rp-actions">
                     <form action="{{ route('company.reava-pay.toggle') }}" method="POST" style="flex:1;display:flex;">
                         @csrf
-                        <button type="submit" class="rp-btn {{ ($company->reava_pay_enabled ?? $settings->is_active) ? 'rp-btn-outline-danger' : 'rp-btn-success' }}" style="width:100%;">
-                            @if($company->reava_pay_enabled ?? $settings->is_active)
+                        <button type="submit" class="rp-btn {{ $isActive ? 'rp-btn-outline-danger' : 'rp-btn-success' }}" style="width:100%;">
+                            @if($isActive)
                                 <i class="bi bi-pause-circle"></i> Disable Reava Pay
                             @else
                                 <i class="bi bi-play-circle"></i> Enable Reava Pay
@@ -855,20 +851,20 @@
         <div class="rp-sidebar">
 
             {{-- Integration Status --}}
-            <div class="rp-status-banner {{ ($company->reava_pay_enabled ?? $settings->is_active) ? 'ok' : 'warn' }}">
+            <div class="rp-status-banner {{ $isActive ? 'ok' : 'warn' }}">
                 <div class="ico">
-                    @if($company->reava_pay_enabled ?? $settings->is_active)
+                    @if($isActive)
                         <i class="bi bi-check-circle-fill" style="font-size:1.2rem;"></i>
                     @else
                         <i class="bi bi-exclamation-triangle-fill" style="font-size:1.2rem;"></i>
                     @endif
                 </div>
                 <div>
-                    <div class="rp-status-title">{{ ($company->reava_pay_enabled ?? $settings->is_active) ? 'Integration Active' : 'Integration Inactive' }}</div>
+                    <div class="rp-status-title">{{ $isActive ? 'Integration Active' : 'Integration Inactive' }}</div>
                     <div class="rp-status-desc">
-                        {{ ($company->reava_pay_enabled ?? $settings->is_active)
+                        {{ $isActive
                             ? 'Reava Pay is live and processing tenant payments.'
-                            : 'Configure credentials and click Enable to start accepting payments.' }}
+                            : 'Save your credentials and click Enable Reava Pay to start accepting payments.' }}
                     </div>
                 </div>
             </div>

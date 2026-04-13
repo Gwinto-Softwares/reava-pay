@@ -5,11 +5,11 @@ namespace Gwinto\ReavaPay;
 use App\Models\Company;
 use App\Models\Tenant;
 use App\Models\WalletTransaction;
-use Gwinto\ReavaPay\Observers\CompanyObserver;
-use Gwinto\ReavaPay\Observers\TenantObserver;
-use Gwinto\ReavaPay\Observers\WalletTransactionObserver;
+use ReavaPay\Gwinto\Observers\CompanyObserver;
+use ReavaPay\Gwinto\Observers\TenantObserver;
+use ReavaPay\Gwinto\Observers\WalletTransactionObserver;
 use Gwinto\ReavaPay\Services\ReavaPayGateway;
-use Gwinto\ReavaPay\Services\WalletSyncService;
+use ReavaPay\Gwinto\Services\WalletSyncService;
 use Illuminate\Support\ServiceProvider;
 
 class ReavaPayServiceProvider extends ServiceProvider
@@ -31,9 +31,7 @@ class ReavaPayServiceProvider extends ServiceProvider
 
         $this->app->alias(ReavaPayGateway::class, 'reava-pay');
 
-        $this->app->singleton(WalletSyncService::class, function ($app) {
-            return new WalletSyncService($app->make(\App\Services\WalletService::class));
-        });
+        $this->app->singleton(WalletSyncService::class);
     }
 
     /**

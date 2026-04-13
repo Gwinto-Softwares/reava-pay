@@ -1,0 +1,35 @@
+{
+    "name": "reava-pay/gwinto",
+    "description": "Reava Pay integration for Gwinto - Multi-tenant rental management, wallet sync, merchant onboarding & payment collection",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Reava Pay",
+            "email": "dev@reavapay.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ReavaPay\\Gwinto\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ReavaPay\\Gwinto\\GwintoServiceProvider"
+            ],
+            "aliases": {
+                "Gwinto": "ReavaPay\\Gwinto\\Facades\\Gwinto"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
